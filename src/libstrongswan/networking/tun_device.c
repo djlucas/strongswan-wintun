@@ -33,8 +33,23 @@
 
 #ifdef TUN_DEVICE_NOT_SUPPORTED
 
+#ifdef WIN32
+#include "windows_tun_provider.h"
+
+#include <library.h>
+#endif
+
 tun_device_t *tun_device_create(const char *name_tmpl)
 {
+#ifdef WIN32
+	windows_tun_device_provider_t *provider;
+
+	provider = lib->get(lib, WINDOWS_TUN_DEVICE_PROVIDER);
+	if (provider)
+	{
+		return provider->create(provider, name_tmpl);
+	}
+#endif
 	DBG1(DBG_LIB, "TUN devices are not supported");
 	return NULL;
 }

@@ -70,7 +70,8 @@ endif
 
 # private header files
 noinst_HEADERS = \
-settings/settings_types.h
+settings/settings_types.h \
+networking/windows_tun_provider.h
 
 if USE_DEV_HEADERS
 strongswan_includedir = ${dev_headers}
