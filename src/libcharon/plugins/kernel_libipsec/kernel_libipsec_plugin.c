@@ -131,24 +131,29 @@ PLUGIN_DEFINE(kernel_libipsec)
 		},
 	);
 
-	if (!libipsec_init())
-	{
-		DBG1(DBG_LIB, "initialization of libipsec failed");
-		destroy(this);
-		return NULL;
-	}
-
 	this->tun = tun_device_create("ipsec%d");
 	if (!this->tun)
 	{
 		DBG1(DBG_KNL, "failed to create TUN device");
-		destroy(this);
+		free(this);
 		return NULL;
 	}
 	if (!this->tun->set_mtu(this->tun, TUN_DEFAULT_MTU) ||
 		!this->tun->up(this->tun))
 	{
 		DBG1(DBG_KNL, "failed to configure TUN device");
+		this->tun->destroy(this->tun);
+		free(this);
+		return NULL;
+	}
+
+	/*
+	 * Initialize libipsec only after all fallible TUN setup has completed.
+	 * Its initialization queues jobs that require its objects to stay alive.
+	 */
+	if (!libipsec_init())
+	{
+		DBG1(DBG_LIB, "initialization of libipsec failed");
 		destroy(this);
 		return NULL;
 	}
