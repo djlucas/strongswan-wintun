@@ -314,6 +314,8 @@ METHOD(kernel_libipsec_router_t, destroy, void,
 	free(this);
 }
 
+#ifndef WIN32
+
 /**
  * Set O_NONBLOCK on the given socket.
  */
@@ -321,6 +323,45 @@ static bool set_nonblock(int socket)
 {
 	int flags = fcntl(socket, F_GETFL);
 	return flags != -1 && fcntl(socket, F_SETFL, flags | O_NONBLOCK) != -1;
+}
+
+#endif /* !WIN32 */
+
+/**
+ * Create a non-blocking notification pair.
+ */
+static bool create_notify(int notify[2])
+{
+#ifdef WIN32
+	u_long on = 1;
+#endif
+
+	notify[0] = notify[1] = -1;
+
+#ifdef WIN32
+	if (socketpair(AF_INET, SOCK_STREAM, 0, notify) == 0 &&
+		ioctlsocket(notify[0], FIONBIO, &on) == 0 &&
+		ioctlsocket(notify[1], FIONBIO, &on) == 0)
+	{
+		return TRUE;
+	}
+#else
+	if (pipe(notify) == 0 &&
+		set_nonblock(notify[0]) && set_nonblock(notify[1]))
+	{
+		return TRUE;
+	}
+#endif
+
+	if (notify[0] != -1)
+	{
+		close(notify[0]);
+	}
+	if (notify[1] != -1)
+	{
+		close(notify[1]);
+	}
+	return FALSE;
 }
 
 /*
@@ -344,10 +385,9 @@ kernel_libipsec_router_t *kernel_libipsec_router_create()
 		.esp_handler = lib->get(lib, "kernel-libipsec-esp-handler"),
 	);
 
-	if (pipe(this->notify) != 0 ||
-		!set_nonblock(this->notify[0]) || !set_nonblock(this->notify[1]))
+	if (!create_notify(this->notify))
 	{
-		DBG1(DBG_KNL, "creating notify pipe for kernel-libipsec router failed");
+		DBG1(DBG_KNL, "creating notify pair for kernel-libipsec router failed");
 		free(this);
 		return NULL;
 	}
