@@ -572,6 +572,13 @@ if MONOLITHIC
 endif
 endif
 
+if USE_KERNEL_WINTUN
+  SUBDIRS += plugins/kernel_wintun
+if MONOLITHIC
+  libcharon_la_LIBADD += plugins/kernel_wintun/libstrongswan-kernel-wintun.la
+endif
+endif
+
 if USE_WHITELIST
   SUBDIRS += plugins/whitelist
 if MONOLITHIC

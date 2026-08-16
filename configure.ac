@@ -221,6 +221,7 @@ ARG_ENABL_SET([kernel-pfroute], [enable the PF_ROUTE kernel interface.])
 ARG_ENABL_SET([kernel-iph],     [enable the Windows IP Helper based networking backend.])
 ARG_ENABL_SET([kernel-libipsec],[enable the libipsec kernel interface.])
 ARG_ENABL_SET([kernel-wfp],     [enable the Windows Filtering Platform IPsec backend.])
+ARG_ENABL_SET([kernel-wintun],  [enable the Windows Wintun TUN device provider.])
 ARG_DISBL_SET([socket-default], [disable default socket implementation for charon.])
 ARG_ENABL_SET([socket-dynamic], [enable dynamic socket implementation for charon])
 ARG_ENABL_SET([socket-win],     [enable Winsock2 based socket implementation for charon])
@@ -905,6 +906,10 @@ AC_COMPILE_IFELSE(
 )
 AM_CONDITIONAL(USE_WINDOWS, [test "x$windows" = xtrue])
 
+if test "x$kernel_wintun" = xtrue && test "x$windows" != xtrue; then
+	AC_MSG_ERROR([kernel-wintun is only supported for Windows targets])
+fi
+
 AC_MSG_CHECKING([for working __attribute__((packed))])
 AC_COMPILE_IFELSE(
 	[AC_LANG_PROGRAM([], [[
@@ -1511,6 +1516,7 @@ ADD_PLUGIN([load-tester],          [c charon])
 ADD_PLUGIN([kernel-libipsec],      [c charon cmd])
 ADD_PLUGIN([kernel-wfp],           [c charon])
 ADD_PLUGIN([kernel-iph],           [c charon])
+ADD_PLUGIN([kernel-wintun],        [c charon])
 ADD_PLUGIN([kernel-pfkey],         [c charon nm cmd])
 ADD_PLUGIN([kernel-pfroute],       [c charon nm cmd])
 ADD_PLUGIN([kernel-netlink],       [c charon nm cmd])
@@ -1671,6 +1677,7 @@ AM_CONDITIONAL(USE_KERNEL_PFROUTE, test x$kernel_pfroute = xtrue)
 AM_CONDITIONAL(USE_KERNEL_LIBIPSEC, test x$kernel_libipsec = xtrue)
 AM_CONDITIONAL(USE_KERNEL_WFP, test x$kernel_wfp = xtrue)
 AM_CONDITIONAL(USE_KERNEL_IPH, test x$kernel_iph = xtrue)
+AM_CONDITIONAL(USE_KERNEL_WINTUN, test x$kernel_wintun = xtrue)
 AM_CONDITIONAL(USE_WHITELIST, test x$whitelist = xtrue)
 AM_CONDITIONAL(USE_EXT_AUTH, test x$ext_auth = xtrue)
 AM_CONDITIONAL(USE_LOOKIP, test x$lookip = xtrue)
@@ -2007,6 +2014,7 @@ AC_CONFIG_FILES([
 	src/libcharon/plugins/kernel_libipsec/Makefile
 	src/libcharon/plugins/kernel_wfp/Makefile
 	src/libcharon/plugins/kernel_iph/Makefile
+	src/libcharon/plugins/kernel_wintun/Makefile
 	src/libcharon/plugins/whitelist/Makefile
 	src/libcharon/plugins/ext_auth/Makefile
 	src/libcharon/plugins/lookip/Makefile
