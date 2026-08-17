@@ -36,10 +36,10 @@ struct private_kernel_wintun_device_t {
 /**
  * Produce the first concrete name from the tun_device_t name template.
  *
- * Patch 5 deliberately supports a single device.  Substituting zero preserves
- * the name expected by kernel-libipsec without implying that a collision may
- * be resolved by adopting another process's adapter.  Indexed allocation is
- * added when multiple devices are supported.
+ * This initial implementation deliberately supports a single device.
+ * Substituting zero preserves the name expected by kernel-libipsec without
+ * implying that a collision may be resolved by adopting another process's
+ * adapter.  Indexed allocation is added when multiple devices are supported.
  */
 static bool format_name(char *name, size_t size, const char *name_tmpl)
 {
@@ -223,7 +223,7 @@ METHOD(tun_device_t, get_name, char*,
 METHOD(tun_device_t, get_fd, int,
 	private_kernel_wintun_device_t *this)
 {
-	/* Patch 6 supplies the Winsock readiness descriptor used by WSAPoll(). */
+	/* The receive path supplies the Winsock descriptor used by WSAPoll(). */
 	return -1;
 }
 
@@ -236,9 +236,9 @@ METHOD(tun_device_t, destroy, void,
 	this->shutting_down = TRUE;
 	context->lifecycle->unlock(context->lifecycle);
 
-	/* Patch 6 joins the receive worker and releases queue/readiness resources
-	 * here, before the session destruction boundary.  Keeping that work outside
-	 * the lifecycle mutex is deliberate: the worker must be allowed to finish
+	/* The receive implementation joins its worker and releases queue/readiness
+	 * resources here, before the session destruction boundary.  Keeping that
+	 * work outside the lifecycle mutex is deliberate: the worker must finish
 	 * without teardown waiting for it while holding its API admission lock. */
 	context->lifecycle->lock(context->lifecycle);
 	if (this->session)

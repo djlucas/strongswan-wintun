@@ -7,4 +7,5 @@
  * option) any later version.  See <http://www.fsf.org/copyleft/gpl.txt>.
  */
 
+TEST_SUITE(device_suite_create)
 TEST_SUITE(provider_suite_create)

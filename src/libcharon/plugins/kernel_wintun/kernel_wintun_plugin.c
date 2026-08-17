@@ -8,6 +8,7 @@
  */
 
 #include "kernel_wintun_plugin.h"
+#include "kernel_wintun_net.h"
 #include "kernel_wintun_provider.h"
 
 #include <library.h>
@@ -30,7 +31,11 @@ METHOD(plugin_t, get_features, int,
 	private_kernel_wintun_plugin_t *this, plugin_feature_t *features[])
 {
 	static plugin_feature_t f[] = {
+		/* Keep an unconditional feature loaded even if another network backend
+		 * wins registration.  The provider may already be borrowed by a TUN. */
 		PLUGIN_PROVIDE(CUSTOM, "kernel-wintun"),
+		PLUGIN_CALLBACK(kernel_net_register, kernel_wintun_net_create),
+			PLUGIN_PROVIDE(CUSTOM, "kernel-net"),
 	};
 	*features = f;
 	return countof(f);
