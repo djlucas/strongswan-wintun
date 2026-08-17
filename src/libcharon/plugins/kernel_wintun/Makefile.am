@@ -14,6 +14,7 @@ endif
 libstrongswan_kernel_wintun_la_SOURCES = \
 	kernel_wintun_plugin.h kernel_wintun_plugin.c \
 	kernel_wintun_api.h kernel_wintun_api.c \
+	kernel_wintun_device.h kernel_wintun_device.c \
 	kernel_wintun_provider.h kernel_wintun_provider.c
 
 libstrongswan_kernel_wintun_la_LDFLAGS = -module -avoid-version
@@ -26,6 +27,7 @@ kernel_wintun_tests_SOURCES = \
 	tests.h tests.c \
 	suites/test_provider.c \
 	kernel_wintun_api.c \
+	kernel_wintun_device.c \
 	kernel_wintun_provider.c
 
 kernel_wintun_tests_CFLAGS = \

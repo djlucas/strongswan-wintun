@@ -13,6 +13,7 @@
 
 #include "kernel_wintun_provider.h"
 #include "kernel_wintun_api.h"
+#include "kernel_wintun_device.h"
 
 #include <utils/debug.h>
 
@@ -24,7 +25,7 @@ typedef struct private_kernel_wintun_provider_t
 struct private_kernel_wintun_provider_t {
 	kernel_wintun_provider_t public;
 	HMODULE module;
-	kernel_wintun_api_t api;
+	kernel_wintun_context_t context;
 };
 
 /**
@@ -85,28 +86,65 @@ static HMODULE load_module(void)
 METHOD(windows_tun_device_provider_t, create, tun_device_t*,
 	private_kernel_wintun_provider_t *this, const char *name_tmpl)
 {
-	DBG1(DBG_LIB, "kernel-wintun TUN device creation is not implemented");
-	return NULL;
+	return kernel_wintun_device_create(&this->context, name_tmpl);
 }
 
 METHOD(kernel_wintun_provider_t, destroy, void,
 	private_kernel_wintun_provider_t *this)
 {
+	u_int active_devices;
+
+	this->context.lifecycle->lock(this->context.lifecycle);
+	this->context.teardown_requested = TRUE;
+	active_devices = this->context.active_devices;
+	if (active_devices)
+	{
+		/* Device lifetime owns both counter transitions; the provider only reads
+		 * the count while holding the shared lifecycle lock.  A nonzero count
+		 * means plugin teardown violated the required lifetime order.  Retain the
+		 * module, API table, mutex, and provider memory so surviving devices can
+		 * reject new API admission and still destroy themselves safely.  This
+		 * bounded leak is intentional.  Reaching zero later does not resume
+		 * teardown; never move deferred unload into a device destructor. */
+		DBG0(DBG_LIB, "kernel-wintun provider teardown requested with %u active "
+			 "device%s; retaining provider state and wintun.dll",
+			 active_devices, active_devices == 1 ? "" : "s");
+		this->context.lifecycle->unlock(this->context.lifecycle);
+		return;
+	}
+	this->context.lifecycle->unlock(this->context.lifecycle);
+
 	if (!FreeLibrary(this->module))
 	{
 		DBG1(DBG_LIB, "unloading wintun.dll failed: Windows error %lu",
 			 GetLastError());
 	}
-	/* kernel-wintun is expected to be the process's only Wintun loader.  A
-	 * remaining module therefore indicates an unexpected external reference. */
-	else if (GetModuleHandleW(WINTUN_DLL_NAME))
-	{
-		DBG1(DBG_LIB, "wintun.dll remains loaded after provider teardown");
-	}
 	else
 	{
-		DBG2(DBG_LIB, "unloaded wintun.dll");
+		if (GetModuleHandleW(WINTUN_DLL_NAME))
+		{
+			if (this->context.device_was_created)
+			{
+				/* WintunCloseAdapter() queues asynchronous orphan cleanup.  Runtime
+				 * validation observed that the module may remain loaded temporarily
+				 * after an adapter lifecycle, but this check cannot identify the
+				 * reference owner. */
+				DBG2(DBG_LIB, "wintun.dll remains loaded after adapter teardown; "
+					 "Wintun cleanup may still be pending");
+			}
+			else
+			{
+				/* With no adapter lifecycle, kernel-wintun is expected to be the
+				 * process's only Wintun loader. */
+				DBG1(DBG_LIB, "wintun.dll remains loaded after provider teardown");
+			}
+		}
+		else
+		{
+			DBG2(DBG_LIB, "unloaded wintun.dll");
+		}
 	}
+	this->context.lifecycle->destroy(this->context.lifecycle);
 	free(this);
 }
 
@@ -121,16 +159,21 @@ kernel_wintun_provider_t *kernel_wintun_provider_create(void)
 			},
 			.destroy = _destroy,
 		},
+		.context = {
+			.lifecycle = mutex_create(MUTEX_TYPE_DEFAULT),
+		},
 	);
 	this->module = load_module();
 	if (!this->module)
 	{
+		this->context.lifecycle->destroy(this->context.lifecycle);
 		free(this);
 		return NULL;
 	}
-	if (!kernel_wintun_api_load(this->module, &this->api))
+	if (!kernel_wintun_api_load(this->module, &this->context.api))
 	{
 		FreeLibrary(this->module);
+		this->context.lifecycle->destroy(this->context.lifecycle);
 		free(this);
 		return NULL;
 	}
